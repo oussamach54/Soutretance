@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-soutretance}
+      POSTGRES_USER: ${DB_USER:-soutretance}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-soutretance-dev-only}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-soutretance} -d ${DB_NAME:-soutretance}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-local-development-only-change-before-deploy}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DB_HOST: db
+      DB_NAME: ${DB_NAME:-soutretance}
+      DB_USER: ${DB_USER:-soutretance}
+      DB_PASSWORD: ${DB_PASSWORD:-soutretance-dev-only}
+      DB_PORT: 5432
+    command: sh -c "python manage.py makemigrations accounts workshop finance && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - uploaded_documents:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  uploaded_documents:
